@@ -1,7 +1,10 @@
+
 <div align="center">
+  <img width="800px" alt="image" src="https://github.com/user-attachments/assets/1259ea89-9f11-4a65-ba92-15f581f73c8b" />
+
   <h1>속닥 (Sokdak)</h1>
 
-  <p><strong>의견은 자유롭게, 공개는 함께.</strong></p>
+  <p><strong>말투는 다듬고, 의견은 자유롭게</strong></p>
 
   <p>
     팀 프로젝트와 동아리 회의에서 각자의 의견을 익명으로 모으고,<br />
