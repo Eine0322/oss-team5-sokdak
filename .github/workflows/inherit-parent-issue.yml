@@ -1,0 +1,124 @@
+name: Inherit sub-issue metadata
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "부모 값을 복사할 서브 이슈 번호"
+        required: true
+        type: string
+
+permissions:
+  issues: write
+
+jobs:
+  inherit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    concurrency:
+      group: inherit-issue-${{ github.event.issue.number || inputs.issue_number }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+    steps:
+      - name: Copy missing assignees and labels from the parent
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.request
+
+          issue_number = os.environ["ISSUE_NUMBER"].strip()
+          if not re.fullmatch(r"[1-9][0-9]*", issue_number):
+              raise SystemExit("Enter a positive issue number.")
+
+          api_url = os.environ["GITHUB_API_URL"].rstrip("/")
+          repo_url = f'{api_url}/repos/{os.environ["GITHUB_REPOSITORY"]}'
+          issue_url = f"{repo_url}/issues/{issue_number}"
+
+          def request(url, body=None):
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                  "X-GitHub-Api-Version": "2026-03-10",
+              }
+              data = None
+              if body is not None:
+                  headers["Content-Type"] = "application/json"
+                  data = json.dumps(body).encode("utf-8")
+              req = urllib.request.Request(url, data=data, headers=headers)
+              with urllib.request.urlopen(req, timeout=10) as response:
+                  return json.load(response)
+
+          def get_parent():
+              # The opened event may arrive before GitHub links the parent.
+              delays = (0, 2, 4, 8, 12, 18) if os.environ["GITHUB_EVENT_NAME"] == "issues" else (0,)
+              for delay in delays:
+                  if delay:
+                      time.sleep(delay)
+                  try:
+                      return request(f"{issue_url}/parent")
+                  except urllib.error.HTTPError as exc:
+                      if exc.code != 404:
+                          raise
+              return None
+
+          def missing_values(parent_items, child_items, field):
+              child_values = {item[field].lower() for item in child_items}
+              return [
+                  item[field] for item in parent_items
+                  if item[field].lower() not in child_values
+              ]
+
+          def main():
+              child = request(issue_url)
+              if "pull_request" in child:
+                  print("Skipping pull request.")
+                  return
+              parent = get_parent()
+              if parent is None:
+                  if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+                      raise SystemExit("This issue has no accessible parent.")
+                  print("No accessible parent found. No changes made.")
+                  return
+
+              if parent.get("repository_url", "").lower() != repo_url.lower():
+                  print("Skipping a parent from another repository.")
+                  return
+
+              labels = missing_values(parent["labels"], child["labels"], "name")
+              assignees = missing_values(parent["assignees"], child["assignees"], "login")
+              warnings = []
+              if labels:
+                  updated = request(f"{issue_url}/labels", {"labels": labels})
+                  warnings.extend(missing_values(
+                      [{"name": label} for label in labels], updated, "name"
+                  ))
+              if assignees:
+                  updated = request(f"{issue_url}/assignees", {"assignees": assignees})
+                  warnings.extend(missing_values(
+                      [{"login": login} for login in assignees], updated["assignees"], "login"
+                  ))
+
+              if warnings:
+                  raise SystemExit(
+                      f"GitHub did not apply {len(warnings)} requested metadata value(s)."
+                  )
+              print(
+                  f"Issue #{issue_number} · parent #{parent['number']} · "
+                  f"added {len(labels)} label(s) and {len(assignees)} assignee(s)."
+              )
+
+          try:
+              main()
+          except urllib.error.HTTPError as exc:
+              raise SystemExit(f"GitHub API request failed (HTTP {exc.code}).") from None
+          except (urllib.error.URLError, TimeoutError):
+              raise SystemExit("Could not reach the GitHub API within the request timeout.") from None
+          PY
