@@ -1,6 +1,6 @@
 name: "✨ FE Feature"
 description: "FE 새로운 기능 추가"
-labels: ["feature"]
+labels: ["Frontend"]
 body:
   - type: textarea
     attributes:
