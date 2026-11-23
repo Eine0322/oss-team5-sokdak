@@ -1,22 +1,19 @@
-html,
-body,
-#root {
+.app {
   width: 100%;
-  min-height: 100dvh;
-}
-
-body {
-  background-color: var(--color-app-background);
-}
-
-#root {
+  min-height: 100svh;
   display: flex;
   justify-content: center;
 }
 
-.app-container {
+.app__container {
   width: 100%;
-  max-width: 402px;
-  min-height: 100dvh;
+  max-width: 450px;
+  min-height: 100svh;
   background-color: var(--color-background);
+}
+
+@media (max-width: 480px) {
+  .app__container {
+    max-width: 100%;
+  }
 }

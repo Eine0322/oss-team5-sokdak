@@ -3,8 +3,10 @@ import './App.css';
 
 function App() {
   return (
-    <div className="app-container">
-      <AppRouter />
+    <div className="app">
+      <div className="app__container">
+        <AppRouter />
+      </div>
     </div>
   );
 }

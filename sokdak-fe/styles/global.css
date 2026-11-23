@@ -6,8 +6,3 @@
 @import './reset.css';
 @import './palette.css';
 @import './font.css';
-
-body {
-  font-family: var(--font-family);
-  background-color: var(--color-app-background);
-}
